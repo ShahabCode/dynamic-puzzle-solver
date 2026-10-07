@@ -1,3 +1,6 @@
+import random
+
+
 class Puzzle:
     def __init__(self, size):
         self.size = size
@@ -6,6 +9,12 @@ class Puzzle:
             for row in range(size)
         ]
         self.board[-1][-1] = 0
+
+        self.goal_state = tuple(
+            tile
+            for row in self.board
+            for tile in row
+        )
 
 
     def find_empty(self):
@@ -35,3 +44,19 @@ class Puzzle:
         self.board[row][col], self.board[new_row][new_col] = \
             self.board[new_row][new_col], self.board[row][col]
         return True
+
+
+    def shuffle(self, moves=100):
+        directions = ["up", "down", "left", "right"]
+
+        for _ in range(moves):
+            direction = random.choice(directions)
+            self.move(direction)
+
+
+    def get_state(self):
+        return tuple(
+            tile
+            for row in self.board
+            for tile in row
+        )
