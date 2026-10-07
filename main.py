@@ -1,6 +1,25 @@
 import random
 
 
+class Node:
+    def __init__(self, state, parent=None, action=None, cost=0, depth=0):
+        self.state = state
+        self.parent = parent
+        self.action = action
+        self.cost = cost
+        self.depth = depth
+
+    def get_path(self):
+        path = []
+        current = self
+        while current is not None:
+            if current.action is not None:
+                path.append(current.action)
+            current = current.parent
+        path.reverse()
+        return path
+
+
 class Puzzle:
     def __init__(self, size):
         self.size = size
