@@ -1,5 +1,7 @@
 import random
 
+import pygame
+
 
 class Node:
     def __init__(self, state, parent=None, action=None, cost=0, depth=0):
@@ -118,3 +120,59 @@ class Puzzle:
             new_puzzle.move(direction)
             neighbors.append(new_puzzle.get_state())
         return neighbors
+
+
+pygame.init()
+
+screen = pygame.display.set_mode((600, 600))
+pygame.display.set_caption("Dynamic Puzzle")
+
+puzzle = Puzzle(5)
+
+running = True
+
+while running:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_UP:
+                puzzle.move("up")
+            elif event.key == pygame.K_DOWN:
+                puzzle.move("down")
+            elif event.key == pygame.K_LEFT:
+                puzzle.move("left")
+            elif event.key == pygame.K_RIGHT:
+                puzzle.move("right")
+
+    screen.fill((30, 30, 30))
+
+    tile_size = tile_size = 600 // puzzle.size
+
+    for row in range(puzzle.size):
+        for col in range(puzzle.size):
+            tile = puzzle.board[row][col]
+
+            if tile != 0:
+                rect = pygame.Rect(
+                    col * tile_size,
+                    row * tile_size,
+                    tile_size,
+                    tile_size
+                )
+
+                pygame.draw.rect(screen, (70, 130, 180), rect)
+
+                font = pygame.font.Font(None, 60)
+                text = font.render(str(tile), True, (255, 255, 255))
+
+                text_rect = text.get_rect(center=rect.center)
+
+                screen.blit(text, text_rect)
+
+    pygame.display.flip()
+
+pygame.quit()
+
+puzzle = Puzzle(5)
