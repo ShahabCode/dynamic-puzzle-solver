@@ -60,3 +60,42 @@ class Puzzle:
             for row in self.board
             for tile in row
         )
+
+
+    def get_possible_moves(self):
+        row, col = self.find_empty()
+        moves = []
+
+        if row > 0:
+            moves.append("up")
+
+        if row < self.size - 1:
+            moves.append("down")
+
+        if col > 0:
+            moves.append("left")
+
+        if col < self.size - 1:
+            moves.append("right")
+
+        return moves
+
+
+    def from_state(self, state):
+        puzzle = Puzzle(self.size)
+
+        puzzle.board = [
+            list(state[row * self.size:(row + 1) * self.size])
+            for row in range(self.size)
+        ]
+        return puzzle
+
+
+    def get_neighbors(self):
+        neighbors = []
+
+        for direction in self.get_possible_moves():
+            new_puzzle = self.from_state(self.get_state())
+            new_puzzle.move(direction)
+            neighbors.append(new_puzzle.get_state())
+        return neighbors
