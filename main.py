@@ -1,5 +1,4 @@
 import random
-
 import pygame
 
 
@@ -263,6 +262,42 @@ def draw_puzzle(puzzle, x, y, board_size, title, accent_color):
 # Main Loop
 # -----------------------------
 
+move_count = 0
+max_moves = 20
+game_over = False
+
+def handle_mouse_click(pos):
+    board_size = 380
+    tile_size = board_size // size
+
+    board_x = 60
+    board_y = 160
+
+    mouse_x, mouse_y = pos
+
+    col = (mouse_x - board_x) // tile_size
+    row = (mouse_y - board_y) // tile_size
+
+    if not (0 <= row < size and 0 <= col < size):
+        return False
+
+    empty_row, empty_col = puzzle.find_empty()
+
+    if abs(row - empty_row) + abs(col - empty_col) == 1:
+        if row < empty_row:
+            return puzzle.move("up")
+        elif row > empty_row:
+            return puzzle.move("down")
+        elif col < empty_col:
+            return puzzle.move("left")
+        elif col > empty_col:
+            return puzzle.move("right")
+
+    return False
+
+solve_button = pygame.Rect(400, 570, 200, 45)
+solve_requested = False
+
 while running:
 
     # -------------------------
@@ -271,31 +306,61 @@ while running:
 
     for event in pygame.event.get():
 
-        if event.type == pygame.QUIT:
-            running = False
-
         if event.type == pygame.KEYDOWN:
 
-            if not game_won:
+            if event.key == pygame.K_r:
+                puzzle = Puzzle(size)
+                puzzle.shuffle()
+
+                move_count = 0
+                game_won = False
+                game_over = False
+
+            elif not game_won and not game_over:
 
                 if event.key == pygame.K_UP:
-                    puzzle.move("up")
+                    moved = puzzle.move("up")
 
                 elif event.key == pygame.K_DOWN:
-                    puzzle.move("down")
+                    moved = puzzle.move("down")
 
                 elif event.key == pygame.K_LEFT:
-                    puzzle.move("left")
+                    moved = puzzle.move("left")
 
                 elif event.key == pygame.K_RIGHT:
-                    puzzle.move("right")
+                    moved = puzzle.move("right")
 
+                else:
+                    moved = False
+
+                if moved:
+                    move_count += 1
+
+
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+
+            if not game_won and not game_over:
+
+                if solve_button.collidepoint(event.pos):
+
+                    solve_requested = True
+
+
+                else:
+
+                    moved = handle_mouse_click(event.pos)
+
+                    if moved:
+                        move_count += 1
     # -------------------------
     # Check Win
     # -------------------------
 
     if puzzle.is_solved():
         game_won = True
+
+    if move_count >= max_moves and not game_won:
+        game_over = True
 
     # -------------------------
     # Background
@@ -322,6 +387,18 @@ while running:
     # -------------------------
     # Cards
     # -------------------------
+
+    moves_text = label_font.render(
+        f"Moves: {move_count}",
+        True,
+        TEXT
+    )
+
+    moves_rect = moves_text.get_rect(
+        center=(WIDTH // 2, 75)
+    )
+
+    screen.blit(moves_text, moves_rect)
 
     card_width = 440
     card_height = 510
@@ -403,18 +480,46 @@ while running:
     # -------------------------
 
     if game_won:
-
-        win_text = title_font.render(
+        result_text = title_font.render(
             "YOU WIN!",
             True,
             GOAL_ACCENT
         )
 
-        win_rect = win_text.get_rect(
-            center=(WIDTH // 2, 620)
+    elif game_over:
+        result_text = title_font.render(
+            "GAME OVER!",
+            True,
+            (255, 90, 100)
         )
 
-        screen.blit(win_text, win_rect)
+    else:
+        result_text = None
+
+    if result_text:
+        result_rect = result_text.get_rect(
+            center=(WIDTH // 2, 620)
+        )
+        screen.blit(result_text, result_rect)
+
+    pygame.draw.rect(
+        screen,
+        ACCENT,
+        solve_button,
+        border_radius=10
+    )
+
+    solve_text = label_font.render(
+        "AUTO SOLVE",
+        True,
+        BACKGROUND
+    )
+
+    solve_text_rect = solve_text.get_rect(
+        center=solve_button.center
+    )
+
+    screen.blit(solve_text, solve_text_rect)
 
     # -------------------------
     # Update Display
