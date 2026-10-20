@@ -1,5 +1,48 @@
+
 import random
 import pygame
+from collections import deque
+import time
+
+
+def bfs(puzzle):
+    start_state = puzzle.get_state()
+    goal_state = puzzle.goal_state
+
+    queue = deque([
+        Node(start_state)
+    ])
+
+    visited = {start_state}
+    explored_nodes = 0
+
+    while queue:
+        current_node = queue.popleft()
+        explored_nodes += 1
+
+        if current_node.state == goal_state:
+            return current_node.get_path(), explored_nodes
+
+        current_puzzle = puzzle.from_state(current_node.state)
+
+        for direction in current_puzzle.get_possible_moves():
+            new_puzzle = current_puzzle.from_state(current_node.state)
+            new_puzzle.move(direction)
+            new_state = new_puzzle.get_state()
+
+            if new_state not in visited:
+                visited.add(new_state)
+
+                child_node = Node(
+                    state=new_state,
+                    parent=current_node,
+                    action=direction,
+                    depth=current_node.depth + 1
+                )
+
+                queue.append(child_node)
+
+    return None, explored_nodes
 
 
 class Node:
@@ -36,13 +79,11 @@ class Puzzle:
             for tile in row
         )
 
-
     def find_empty(self):
         for row in range(self.size):
             for col in range(self.size):
                 if self.board[row][col] == 0:
                     return row, col
-
 
     def move(self, direction):
         row, col = self.find_empty()
@@ -65,7 +106,6 @@ class Puzzle:
             self.board[new_row][new_col], self.board[row][col]
         return True
 
-
     def shuffle(self, moves=100):
         directions = ["up", "down", "left", "right"]
 
@@ -73,14 +113,12 @@ class Puzzle:
             direction = random.choice(directions)
             self.move(direction)
 
-
     def get_state(self):
         return tuple(
             tile
             for row in self.board
             for tile in row
         )
-
 
     def get_possible_moves(self):
         row, col = self.find_empty()
@@ -100,7 +138,6 @@ class Puzzle:
 
         return moves
 
-
     def from_state(self, state):
         puzzle = Puzzle(self.size)
 
@@ -110,7 +147,6 @@ class Puzzle:
         ]
         return puzzle
 
-
     def get_neighbors(self):
         neighbors = []
 
@@ -119,7 +155,6 @@ class Puzzle:
             new_puzzle.move(direction)
             neighbors.append(new_puzzle.get_state())
         return neighbors
-
 
     def is_solved(self):
         return self.get_state() == self.goal_state
@@ -133,7 +168,7 @@ pygame.init()
 # -----------------------------
 
 WIDTH = 1000
-HEIGHT = 650
+HEIGHT = 800
 
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Dynamic Puzzle Solver")
@@ -295,8 +330,44 @@ def handle_mouse_click(pos):
 
     return False
 
+
 solve_button = pygame.Rect(400, 570, 200, 45)
+restart_button = pygame.Rect(420, 625, 160, 45)
+
 solve_requested = False
+solution = []
+solution_index = 0
+last_move_time = 0
+is_solving = False
+
+# NEW: Initialize statistics before the first frame
+explored_nodes = 0
+elapsed_time = 0.0
+
+
+# NEW: Shared restart logic for the R key and button
+def restart_game():
+    global puzzle, move_count, game_won, game_over
+    global solve_requested, solution, solution_index
+    global last_move_time, is_solving
+    global explored_nodes, elapsed_time
+
+    puzzle = Puzzle(size)
+    puzzle.shuffle()
+
+    move_count = 0
+    game_won = False
+    game_over = False
+
+    solve_requested = False
+    solution = []
+    solution_index = 0
+    last_move_time = 0
+    is_solving = False
+
+    explored_nodes = 0
+    elapsed_time = 0.0
+
 
 while running:
 
@@ -306,17 +377,16 @@ while running:
 
     for event in pygame.event.get():
 
-        if event.type == pygame.KEYDOWN:
+        if event.type == pygame.QUIT:
+            running = False
 
+        elif event.type == pygame.KEYDOWN:
+
+            # R works during the game, after winning, and after losing
             if event.key == pygame.K_r:
-                puzzle = Puzzle(size)
-                puzzle.shuffle()
+                restart_game()
 
-                move_count = 0
-                game_won = False
-                game_over = False
-
-            elif not game_won and not game_over:
+            elif not game_won and not game_over and not is_solving:
 
                 if event.key == pygame.K_UP:
                     moved = puzzle.move("up")
@@ -336,31 +406,81 @@ while running:
                 if moved:
                     move_count += 1
 
-
         elif event.type == pygame.MOUSEBUTTONDOWN:
 
-            if not game_won and not game_over:
+            if event.button == 1:
 
-                if solve_button.collidepoint(event.pos):
+                # Restart button works in every game state
+                if restart_button.collidepoint(event.pos):
+                    restart_game()
 
+                elif (
+                    solve_button.collidepoint(event.pos)
+                    and not game_won
+                    and not game_over
+                    and not is_solving
+                ):
                     solve_requested = True
 
-
-                else:
-
+                elif (
+                    not game_won
+                    and not game_over
+                    and not is_solving
+                ):
                     moved = handle_mouse_click(event.pos)
 
                     if moved:
                         move_count += 1
+
     # -------------------------
     # Check Win
     # -------------------------
 
     if puzzle.is_solved():
         game_won = True
+        game_over = False
+        is_solving = False
 
-    if move_count >= max_moves and not game_won:
+    if move_count >= max_moves and not game_won and not is_solving:
         game_over = True
+
+    # -------------------------
+    # Start BFS
+    # -------------------------
+
+    if solve_requested:
+        start_time = time.perf_counter()
+
+        solution, explored_nodes = bfs(puzzle)
+
+        elapsed_time = time.perf_counter() - start_time
+
+        solution = solution or []
+        solution_index = 0
+        last_move_time = pygame.time.get_ticks()
+        is_solving = bool(solution)
+        solve_requested = False
+
+        if not solution and puzzle.is_solved():
+            game_won = True
+
+    # -------------------------
+    # Automatic Moves
+    # -------------------------
+
+    if is_solving and solution_index < len(solution):
+        current_time = pygame.time.get_ticks()
+
+        if current_time - last_move_time >= 300:
+            puzzle.move(solution[solution_index])
+            solution_index += 1
+            last_move_time = current_time
+
+            # Count automatic moves too
+            move_count += 1
+
+            if solution_index >= len(solution):
+                is_solving = False
 
     # -------------------------
     # Background
@@ -476,7 +596,69 @@ while running:
     )
 
     # -------------------------
-    # Win Message
+    # BFS Statistics
+    # -------------------------
+
+    stats_text = label_font.render(
+        f"Nodes: {explored_nodes} | Time: {elapsed_time:.4f}s",
+        True,
+        SECONDARY_TEXT
+    )
+
+    stats_rect = stats_text.get_rect(
+        center=(WIDTH // 2, 700)
+    )
+
+    screen.blit(stats_text, stats_rect)
+
+    # -------------------------
+    # AUTO SOLVE Button
+    # -------------------------
+
+    pygame.draw.rect(
+        screen,
+        ACCENT,
+        solve_button,
+        border_radius=10
+    )
+
+    solve_text = label_font.render(
+        "SOLVING..." if is_solving else "AUTO SOLVE",
+        True,
+        BACKGROUND
+    )
+
+    solve_text_rect = solve_text.get_rect(
+        center=solve_button.center
+    )
+
+    screen.blit(solve_text, solve_text_rect)
+
+    # -------------------------
+    # RESTART Button
+    # -------------------------
+
+    pygame.draw.rect(
+        screen,
+        GOAL_ACCENT,
+        restart_button,
+        border_radius=10
+    )
+
+    restart_text = label_font.render(
+        "RESTART",
+        True,
+        BACKGROUND
+    )
+
+    restart_text_rect = restart_text.get_rect(
+        center=restart_button.center
+    )
+
+    screen.blit(restart_text, restart_text_rect)
+
+    # -------------------------
+    # Win / Game Over Message
     # -------------------------
 
     if game_won:
@@ -498,28 +680,9 @@ while running:
 
     if result_text:
         result_rect = result_text.get_rect(
-            center=(WIDTH // 2, 620)
+            center=(WIDTH // 2, 755)
         )
         screen.blit(result_text, result_rect)
-
-    pygame.draw.rect(
-        screen,
-        ACCENT,
-        solve_button,
-        border_radius=10
-    )
-
-    solve_text = label_font.render(
-        "AUTO SOLVE",
-        True,
-        BACKGROUND
-    )
-
-    solve_text_rect = solve_text.get_rect(
-        center=solve_button.center
-    )
-
-    screen.blit(solve_text, solve_text_rect)
 
     # -------------------------
     # Update Display
